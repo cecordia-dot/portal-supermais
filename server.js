@@ -16,7 +16,8 @@ const pool = new Pool({ connectionString: DATABASE_URL, ssl: process.env.PGSSL =
 const SESSION_DAYS = Math.max(1, Number(process.env.SESSION_DAYS || 7));
 
 const clean = s => String(s ?? '').trim();
-const num = v => Number(String(v ?? '').replace(',', '.')) || 0;
+const num = v => { const s=String(v ?? '').trim(); if(!s)return 0; return Number(s.includes(',')?s.replace(/\./g,'').replace(',','.'):s) || 0; };
+const decimal = v => Math.max(0, num(v));
 const int = v => Math.max(0, parseInt(v) || 0);
 function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) { return `${salt}:${crypto.scryptSync(password, salt, 64).toString('hex')}`; }
 function checkPassword(password, stored) { try { const [salt, hash] = stored.split(':'); return crypto.timingSafeEqual(crypto.scryptSync(password, salt, 64), Buffer.from(hash, 'hex')); } catch { return false; } }
@@ -56,12 +57,22 @@ async function initDb(){
       category TEXT NOT NULL,
       unit TEXT NOT NULL,
       price NUMERIC(12,2) NOT NULL CHECK(price >= 0),
-      stock INTEGER NOT NULL DEFAULT 0 CHECK(stock >= 0),
+      stock NUMERIC(14,3) NOT NULL DEFAULT 0 CHECK(stock >= 0),
       entry_date DATE,
       lot TEXT,
       expiry_date DATE,
       icon TEXT DEFAULT '📦',
       image_url TEXT,
+      sysmo_name TEXT,
+      sysmo_brand TEXT,
+      sysmo_total_value NUMERIC(14,4),
+      sysmo_unit_cost NUMERIC(14,4),
+      lock_name BOOLEAN NOT NULL DEFAULT FALSE,
+      lock_brand BOOLEAN NOT NULL DEFAULT FALSE,
+      lock_category BOOLEAN NOT NULL DEFAULT FALSE,
+      lock_unit BOOLEAN NOT NULL DEFAULT FALSE,
+      lock_price BOOLEAN NOT NULL DEFAULT FALSE,
+      lock_image BOOLEAN NOT NULL DEFAULT FALSE,
       active BOOLEAN NOT NULL DEFAULT TRUE,
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
@@ -89,6 +100,17 @@ async function initDb(){
     CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
     CREATE INDEX IF NOT EXISTS idx_products_active_name ON products(active,name);
   `);
+  await pool.query(`ALTER TABLE products ALTER COLUMN stock TYPE NUMERIC(14,3) USING stock::numeric`);
+  await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS sysmo_name TEXT`);
+  await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS sysmo_brand TEXT`);
+  await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS sysmo_total_value NUMERIC(14,4)`);
+  await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS sysmo_unit_cost NUMERIC(14,4)`);
+  await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS lock_name BOOLEAN NOT NULL DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS lock_brand BOOLEAN NOT NULL DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS lock_category BOOLEAN NOT NULL DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS lock_unit BOOLEAN NOT NULL DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS lock_price BOOLEAN NOT NULL DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS lock_image BOOLEAN NOT NULL DEFAULT FALSE`);
   await seed();
 }
 
@@ -146,18 +168,73 @@ async function api(req,res,url){
   if(p==='/api/products'&&req.method==='GET'){const u=await requireAuth(req,res);if(!u)return;const r=await pool.query('SELECT * FROM products WHERE active=TRUE ORDER BY name');return json(res,200,{products:r.rows});}
   if(p==='/api/products'&&req.method==='POST'){
     if(!await requireAuth(req,res,'admin'))return;const b=await parseBody(req);if(['code','name','brand','category','unit'].some(k=>!clean(b[k])))return json(res,400,{error:'Preencha os campos obrigatórios.'});
-    try{const r=await pool.query(`INSERT INTO products(code,ean,name,brand,category,unit,price,stock,entry_date,lot,expiry_date,icon,image_url) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,[clean(b.code),clean(b.ean)||null,clean(b.name),clean(b.brand),clean(b.category),clean(b.unit),num(b.price),int(b.stock),b.entry_date||null,clean(b.lot)||null,b.expiry_date||null,clean(b.icon)||'📦',clean(b.image_url)||null]);return json(res,201,{product:r.rows[0]});}catch(e){return json(res,400,{error:e.code==='23505'?'Código já cadastrado.':'Não foi possível cadastrar.'});}
+    try{const r=await pool.query(`INSERT INTO products(code,ean,name,brand,category,unit,price,stock,entry_date,lot,expiry_date,icon,image_url,lock_name,lock_brand,lock_category,lock_unit,lock_price,lock_image) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING *`,[clean(b.code),clean(b.ean)||null,clean(b.name),clean(b.brand),clean(b.category),clean(b.unit),num(b.price),decimal(b.stock),b.entry_date||null,clean(b.lot)||null,b.expiry_date||null,clean(b.icon)||'📦',clean(b.image_url)||null,!!b.lock_name,!!b.lock_brand,!!b.lock_category,!!b.lock_unit,!!b.lock_price,!!b.lock_image]);return json(res,201,{product:r.rows[0]});}catch(e){return json(res,400,{error:e.code==='23505'?'Código já cadastrado.':'Não foi possível cadastrar.'});}
   }
   m=routeMatch(p,/^\/api\/products\/(\d+)$/);
   if(m&&req.method==='PUT'){
     if(!await requireAuth(req,res,'admin'))return;const b=await parseBody(req),id=Number(m[0]);
-    try{const r=await pool.query(`UPDATE products SET code=$1,ean=$2,name=$3,brand=$4,category=$5,unit=$6,price=$7,stock=$8,entry_date=$9,lot=$10,expiry_date=$11,icon=$12,image_url=$13,updated_at=NOW() WHERE id=$14 RETURNING *`,[clean(b.code),clean(b.ean)||null,clean(b.name),clean(b.brand),clean(b.category),clean(b.unit),num(b.price),int(b.stock),b.entry_date||null,clean(b.lot)||null,b.expiry_date||null,clean(b.icon)||'📦',clean(b.image_url)||null,id]);return json(res,200,{product:r.rows[0]});}catch{return json(res,400,{error:'Não foi possível atualizar.'});}
+    try{const r=await pool.query(`UPDATE products SET code=$1,ean=$2,name=$3,brand=$4,category=$5,unit=$6,price=$7,stock=$8,entry_date=$9,lot=$10,expiry_date=$11,icon=$12,image_url=$13,lock_name=$14,lock_brand=$15,lock_category=$16,lock_unit=$17,lock_price=$18,lock_image=$19,updated_at=NOW() WHERE id=$20 RETURNING *`,[clean(b.code),clean(b.ean)||null,clean(b.name),clean(b.brand),clean(b.category),clean(b.unit),num(b.price),decimal(b.stock),b.entry_date||null,clean(b.lot)||null,b.expiry_date||null,clean(b.icon)||'📦',clean(b.image_url)||null,!!b.lock_name,!!b.lock_brand,!!b.lock_category,!!b.lock_unit,!!b.lock_price,!!b.lock_image,id]);return json(res,200,{product:r.rows[0]});}catch{return json(res,400,{error:'Não foi possível atualizar.'});}
   }
   if(m&&req.method==='DELETE'){if(!await requireAuth(req,res,'admin'))return;await pool.query('UPDATE products SET active=FALSE WHERE id=$1',[Number(m[0])]);return json(res,200,{ok:true});}
 
   if(p==='/api/products/import'&&req.method==='POST'){
-    if(!await requireAuth(req,res,'admin'))return;const b=await parseBody(req);const rows=Array.isArray(b.rows)?b.rows:[];if(!rows.length)return json(res,400,{error:'Nenhuma linha válida encontrada.'});
-    const client=await pool.connect();let created=0,updated=0,errors=[];try{await client.query('BEGIN');for(let i=0;i<rows.length;i++){const x=rows[i];if(!clean(x.code)||!clean(x.name)){if(errors.length<20)errors.push({line:i+2,error:'Código e produto são obrigatórios.'});continue;}try{const found=await client.query('SELECT id FROM products WHERE code=$1',[clean(x.code)]);if(found.rowCount){await client.query(`UPDATE products SET ean=$1,name=$2,brand=$3,category=$4,unit=$5,price=$6,stock=$7,entry_date=$8,lot=$9,expiry_date=$10,image_url=$11,active=TRUE,updated_at=NOW() WHERE code=$12`,[clean(x.ean)||null,clean(x.name),clean(x.brand)||'Sem marca',clean(x.category)||'Outros',clean(x.unit)||'Un.',num(x.price),int(x.stock),x.entry_date||null,clean(x.lot)||null,x.expiry_date||null,clean(x.image_url)||null,clean(x.code)]);updated++;}else{await client.query(`INSERT INTO products(code,ean,name,brand,category,unit,price,stock,entry_date,lot,expiry_date,image_url,active) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,TRUE)`,[clean(x.code),clean(x.ean)||null,clean(x.name),clean(x.brand)||'Sem marca',clean(x.category)||'Outros',clean(x.unit)||'Un.',num(x.price),int(x.stock),x.entry_date||null,clean(x.lot)||null,x.expiry_date||null,clean(x.image_url)||null]);created++;}}catch(e){if(errors.length<20)errors.push({line:i+2,error:e.message});}}await client.query('COMMIT');return json(res,200,{created,updated,errors,total:rows.length});}catch(e){await client.query('ROLLBACK');return json(res,400,{error:e.message});}finally{client.release();}
+    if(!await requireAuth(req,res,'admin'))return;
+    const b=await parseBody(req),rows=Array.isArray(b.rows)?b.rows:[],source=clean(b.source||'standard').toLowerCase();
+    if(!rows.length)return json(res,400,{error:'Nenhuma linha válida encontrada.'});
+    const client=await pool.connect();let created=0,updated=0,errors=[],reviewPrice=0;
+    try{
+      await client.query('BEGIN');
+      for(let i=0;i<rows.length;i++){
+        const x=rows[i],code=clean(x.code),name=clean(x.name);
+        if(!code||!name){if(errors.length<20)errors.push({line:i+1,error:'Código e produto são obrigatórios.'});continue;}
+        try{
+          const found=await client.query('SELECT * FROM products WHERE code=$1',[code]);
+          if(source==='sysmo'){
+            const stock=decimal(x.stock),totalValue=clean(x.sysmo_total_value)===''?null:num(x.sysmo_total_value);
+            const unitCost=totalValue!==null&&stock>0?Number((totalValue/stock).toFixed(4)):null;
+            if(found.rowCount){
+              await client.query(`UPDATE products SET
+                stock=$1,sysmo_name=$2,sysmo_brand=$3,sysmo_total_value=$4,sysmo_unit_cost=$5,
+                name=CASE WHEN lock_name THEN name ELSE $2 END,
+                brand=CASE WHEN lock_brand THEN brand ELSE $3 END,
+                active=TRUE,updated_at=NOW()
+                WHERE code=$6`,
+                [stock,name,clean(x.brand)||'Sem marca',totalValue,unitCost,code]);
+              updated++;
+            }else{
+              await client.query(`INSERT INTO products(code,name,brand,category,unit,price,stock,sysmo_name,sysmo_brand,sysmo_total_value,sysmo_unit_cost,active)
+                VALUES($1,$2,$3,'Outros','Un.',0,$4,$2,$3,$5,$6,TRUE)`,
+                [code,name,clean(x.brand)||'Sem marca',stock,totalValue,unitCost]);
+              created++;reviewPrice++;
+            }
+          }else{
+            if(found.rowCount){
+              await client.query(`UPDATE products SET
+                ean=$1,
+                name=CASE WHEN lock_name THEN name ELSE $2 END,
+                brand=CASE WHEN lock_brand THEN brand ELSE $3 END,
+                category=CASE WHEN lock_category THEN category ELSE $4 END,
+                unit=CASE WHEN lock_unit THEN unit ELSE $5 END,
+                price=CASE WHEN lock_price THEN price ELSE $6 END,
+                stock=$7,entry_date=$8,lot=$9,expiry_date=$10,
+                image_url=CASE WHEN lock_image THEN image_url ELSE $11 END,
+                active=TRUE,updated_at=NOW()
+                WHERE code=$12`,
+                [clean(x.ean)||null,name,clean(x.brand)||'Sem marca',clean(x.category)||'Outros',clean(x.unit)||'Un.',num(x.price),decimal(x.stock),x.entry_date||null,clean(x.lot)||null,x.expiry_date||null,clean(x.image_url)||null,code]);
+              updated++;
+            }else{
+              await client.query(`INSERT INTO products(code,ean,name,brand,category,unit,price,stock,entry_date,lot,expiry_date,image_url,active)
+                VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,TRUE)`,
+                [code,clean(x.ean)||null,name,clean(x.brand)||'Sem marca',clean(x.category)||'Outros',clean(x.unit)||'Un.',num(x.price),decimal(x.stock),x.entry_date||null,clean(x.lot)||null,x.expiry_date||null,clean(x.image_url)||null]);
+              created++;
+            }
+          }
+        }catch(e){if(errors.length<20)errors.push({line:i+1,error:e.message});}
+      }
+      await client.query('COMMIT');
+      return json(res,200,{created,updated,errors,total:rows.length,source,reviewPrice});
+    }catch(e){await client.query('ROLLBACK');return json(res,400,{error:e.message});}
+    finally{client.release();}
   }
 
   if(p==='/api/associates'&&req.method==='GET'){if(!await requireAuth(req,res,'admin'))return;const r=await pool.query(`SELECT a.*,COUNT(u.id)::int user_count FROM associates a LEFT JOIN users u ON u.associate_id=a.id AND u.active=TRUE GROUP BY a.id ORDER BY a.trade_name`);return json(res,200,{associates:r.rows});}

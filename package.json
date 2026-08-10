@@ -1,9 +1,16 @@
 {
   "name": "portal-rede-super-mais",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
-  "description": "Portal de compras para associados da Rede Super Mais",
-  "scripts": {"start": "node server.js", "check": "node --check server.js"},
-  "engines": {"node": ">=22.5.0"},
-  "dependencies": {"pg": "^8.13.1"}
+  "description": "Portal de compras Rede Super Mais com importação Sysmo e proteção de campos manuais",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  }
 }
