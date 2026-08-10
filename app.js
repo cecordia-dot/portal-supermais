@@ -1,5 +1,18 @@
 const state={token:localStorage.getItem('sm_token')||'',user:null,products:[],orders:[],associates:[],users:[],stats:{},cart:JSON.parse(localStorage.getItem('sm_cart')||'[]'),view:'dashboard',search:'',category:'Todos',editing:null,editingAssociate:null,editingUser:null};
-const $=s=>document.querySelector(s);const money=v=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});const dateBR=v=>v?new Date(v+'T12:00:00').toLocaleDateString('pt-BR'):'—';const dateTimeBR=v=>v?new Date(v.replace(' ','T')+'Z').toLocaleString('pt-BR'):'—';const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+const $=s=>document.querySelector(s);const money=v=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});const dateBR=v=>{
+  if(!v)return '—';
+  const d=new Date(String(v).length<=10?String(v)+'T12:00:00':v);
+  return isNaN(d)?'—':d.toLocaleDateString('pt-BR');
+};
+
+const dateTimeBR=v=>{
+  if(!v)return '—';
+  const d=new Date(v);
+  return isNaN(d)?'—':d.toLocaleString('pt-BR',{
+    dateStyle:'short',
+    timeStyle:'short'
+  });
+};const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 async function api(url,opt={}){opt.headers={...(opt.headers||{}),'Content-Type':'application/json'};if(state.token)opt.headers.Authorization='Bearer '+state.token;const r=await fetch(url,opt);const d=await r.json().catch(()=>({}));if(!r.ok){if(r.status===401&&state.user)logout(false);throw new Error(d.error||'Erro na operação.')}return d}
 function toast(msg,bad=false){let t=document.querySelector('.toast');if(!t){t=document.createElement('div');t.className='toast';document.body.appendChild(t)}t.textContent=msg;t.className='toast '+(bad?'bad ':'')+'show';clearTimeout(window._toast);window._toast=setTimeout(()=>t.classList.remove('show'),2600)}
 function saveCart(){localStorage.setItem('sm_cart',JSON.stringify(state.cart))}
