@@ -1,0 +1,3 @@
+codigo;ean;produto;marca;categoria;unidade;preco;estoque;data_entrada;lote;validade;imagem_url
+ARR001;7896006711111;Arroz Branco 5kg;Tio João;Alimentos;Fardo c/ 6 un.;23,90;48;2026-08-08;L2408;2027-08-08;
+NOV009;7890000000009;Macarrão Espaguete 500g;Exemplo;Alimentos;Fardo c/ 20 un.;4,59;90;2026-08-10;M1008;2027-08-10;https://exemplo.com/produto.jpg

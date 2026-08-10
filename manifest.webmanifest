@@ -1,0 +1,10 @@
+{
+  "name":"Rede Super Mais - Portal de Compras",
+  "short_name":"Super Mais",
+  "start_url":"/",
+  "display":"standalone",
+  "background_color":"#f6f7fb",
+  "theme_color":"#100654",
+  "description":"Portal de compras dos associados da Rede Super Mais",
+  "icons":[{"src":"/logo-supermais.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},{"src":"/logo-supermais.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}]
+}
