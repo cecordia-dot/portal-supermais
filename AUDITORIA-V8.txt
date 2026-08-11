@@ -1,0 +1,25 @@
+REDE SUPER MAIS — V8 AUDITADA
+
+Principais correções desta revisão:
+- IDs normalizados em produtos, associados, usuários, carrinho e pedidos.
+- Formulários não dependem mais de variáveis globais criadas pelo navegador.
+- Cabeçalho/perfil alinhado e menu do usuário funcional.
+- Menu mobile com overlay e fechamento correto.
+- Busca global e filtros de produtos revisados.
+- Carrinho revisado: estoque, preço, quantidade, remoção e confirmação do pedido.
+- Produtos sem preço não podem ser enviados por engano.
+- Detalhes de pedidos funcionam no associado e no administrativo.
+- Alteração de status tem feedback e restaura a opção anterior em caso de erro.
+- Cancelar pedido devolve o estoque; reabrir pedido reserva novamente com validação.
+- CRUD de produto, associado e usuário com validações e estados vazios.
+- Importação Sysmo/CSV com preview, feedback e cache PWA atualizado.
+- Tabelas, formulários, cards e responsividade revisados.
+
+Arquivos principais para atualizar no GitHub:
+app.js
+style.css
+server.js
+service-worker.js
+package.json
+
+Após o deploy ficar Live, use Ctrl+F5 uma vez.

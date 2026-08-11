@@ -1,11 +1,11 @@
 {
   "name": "portal-rede-super-mais",
-  "version": "0.6.0",
+  "version": "0.8.0",
   "private": true,
-  "description": "Portal de compras Rede Super Mais com importação Sysmo e proteção de campos manuais",
+  "description": "Portal Rede Super Mais revisado ponta a ponta: UI moderna, interações, Sysmo e pedidos",
   "scripts": {
     "start": "node server.js",
-    "check": "node --check server.js"
+    "check": "node --check server.js && node --check app.js"
   },
   "engines": {
     "node": ">=22.5.0"
