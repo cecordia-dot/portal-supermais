@@ -1,0 +1,28 @@
+REDE SUPER MAIS — v8.3 MOBILE FIRST
+
+Principais melhorias:
+- Navegação inferior do associado com contador no carrinho.
+- Carrinho flutuante no catálogo quando houver itens.
+- Cards de produto compactos e próprios para toque em telas pequenas.
+- Quantidade e botão Adicionar maiores e mais fáceis de tocar.
+- Carrinho reorganizado em cards no celular.
+- Pedidos do associado reorganizados para leitura vertical.
+- Tabelas administrativas viram cards no celular (produtos, associados, usuários e pedidos).
+- Formulários administrativos empilhados e ações fixadas no rodapé da tela.
+- Sidebar mobile maior e mais confortável, com overlay.
+- Busca, filtros e categorias otimizados para toque.
+- Safe-area para aparelhos com notch e PWA instalada.
+- Perfil do topo ajustado em telas pequenas.
+- Importação CSV adaptada para celular.
+- Touch targets mínimos próximos de 44px.
+- Cache PWA atualizado para forçar a nova interface.
+
+Arquivos alterados nesta versão:
+- app.js
+- style.css
+- service-worker.js
+
+Validações executadas:
+- node --check app.js
+- node --check server.js
+- node --check service-worker.js
