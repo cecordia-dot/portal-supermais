@@ -141,17 +141,33 @@ function layout(content){
     ${!admin?mobileNav():''}
   </main></div>`;
 }
+function syncSearchInputs(v,sourceId=''){
+  ['global_product_search','catalog_product_search','admin_product_search'].forEach(id=>{if(id!==sourceId){const el=byId(id);if(el&&el.value!==v)el.value=v}});
+}
+function applyLiveProductFilter(v){
+  state.search=v;
+  const q=String(v||'').toLowerCase().trim();
+  let visible=0;
+  document.querySelectorAll('[data-product-search]').forEach(el=>{
+    const hit=!q||String(el.dataset.productSearch||'').includes(q);
+    const catOk=state.category==='Todos'||el.dataset.productCategory===String(state.category||'');
+    const show=hit&&catOk;
+    el.style.display=show?'':'none';
+    if(show)visible++;
+  });
+  const count=byId('catalog_result_count'); if(count) count.textContent=`${visible} produtos encontrados`;
+  const adminCount=byId('admin_product_count'); if(adminCount) adminCount.textContent=visible;
+}
 function updateProductSearch(v, focusId, forceProducts=false){
   state.search=v;
-  if(forceProducts && state.view!=='products') state.view='products';
-  render();
-  requestAnimationFrame(()=>{
-    const input=byId(focusId);
-    if(!input)return;
-    input.focus();
-    const end=input.value.length;
-    try{input.setSelectionRange(end,end)}catch{}
-  });
+  syncSearchInputs(v,focusId);
+  if(forceProducts && state.view!=='products'){
+    state.view='products';
+    render();
+    requestAnimationFrame(()=>{const input=byId('catalog_product_search')||byId('global_product_search');if(input){input.focus();try{input.setSelectionRange(input.value.length,input.value.length)}catch{}}});
+    return;
+  }
+  applyLiveProductFilter(v);
 }
 function globalSearch(v){ updateProductSearch(v,'global_product_search',true); }
 function mobileNav(){const cartCount=state.cart.reduce((s,x)=>s+Number(x.qty||0),0);return `<nav class="mobile-bottom" aria-label="Navegação principal">${[['dashboard','⌂','Início'],['products','▦','Produtos'],['cart','🛒','Carrinho'],['orders','📋','Pedidos']].map(x=>`<button class="${state.view===x[0]?'active':''}" onclick="setView('${x[0]}')"><span class="mobile-nav-icon">${x[1]}${x[0]==='cart'&&cartCount?`<i>${cartCount>99?'99+':cartCount}</i>`:''}</span><small>${x[2]}</small></button>`).join('')}</nav>`}
@@ -186,18 +202,19 @@ function associateProducts(){
   const list=filteredProducts(), cartCount=state.cart.reduce((s,x)=>s+x.qty,0);
   return `${pageTitle('CATÁLOGO','Produtos disponíveis','Preços e estoque atualizados pela central.',`<button class="btn btn-primary" onclick="setView('cart')">🛒 Carrinho (${cartCount})</button>`)}
   <div class="catalog-layout"><aside class="filter-panel"><div class="field"><label>Buscar</label><input id="catalog_product_search" placeholder="Produto, marca, código..." value="${esc(state.search)}" oninput="updateProductSearch(this.value,'catalog_product_search')"></div><label class="filter-label">Categoria</label><div class="filter-cats"><button class="${state.category==='Todos'?'active':''}" onclick="state.category='Todos';render()">Todas</button>${categories().map(c=>`<button class="${state.category===c?'active':''}" onclick="state.category=decodeURIComponent('${encodeURIComponent(c)}');render()">${esc(c)}</button>`).join('')}</div></aside>
-  <section><div class="catalog-head"><div><h2>${esc(state.category)}</h2><span class="meta">${list.length} produtos encontrados</span></div>${state.search||state.category!=='Todos'?`<button class="btn btn-ghost" onclick="clearProductFilters()">Limpar filtros</button>`:''}</div>
+  <section><div class="catalog-head"><div><h2>${esc(state.category)}</h2><span class="meta" id="catalog_result_count">${list.length} produtos encontrados</span></div>${state.search||state.category!=='Todos'?`<button class="btn btn-ghost" onclick="clearProductFilters()">Limpar filtros</button>`:''}</div>
   <div class="product-grid">${list.length?list.map(productCard).join(''):'<div class="panel empty wide">Nenhum produto encontrado com esses filtros.</div>'}</div></section></div>${mobileCartDock(cartCount)}`;
 }
 function clearProductFilters(){state.search='';state.category='Todos';render()}
 function mobileCartDock(count){if(!count)return '';const total=state.cart.reduce((sum,x)=>sum+Number(x.price||0)*Number(x.qty||0),0);return `<button class="mobile-cart-dock" onclick="setView('cart')"><span><b>🛒 ${count} ${count===1?'item':'itens'}</b><small>Ver carrinho</small></span><strong>${money(total)}</strong></button>`}
 function productCard(p){
   const stock=Number(p.stock), unavailable=stock<=0, price=Number(p.price);
-  return `<article class="product-card ${unavailable?'out':''}">${productThumb(p)}<span class="code">Cód. ${esc(p.code)}${p.ean?' · '+esc(p.ean):''}</span><h3>${esc(p.name)}</h3><div class="product-brand">${esc(p.brand)}</div><div class="product-price">${price>0?money(price):'<span class="price-review">Preço sob consulta</span>'}</div><div class="product-unit">${esc(p.unit)}</div><div class="stock ${stock<20?'critical':stock<50?'low':'ok'}">● ${unavailable?'Sem estoque':`${qtyBR(stock)} em estoque`}</div><div class="product-entry">Entrada: ${dateBR(p.entry_date)} · Lote: ${esc(p.lot||'—')}</div><div class="product-actions"><input id="q${p.id}" aria-label="Quantidade" type="number" min="1" max="${Math.floor(stock)}" value="1" ${unavailable?'disabled':''}><button class="btn btn-primary" onclick="addCart('${p.id}')" ${unavailable||price<=0?'disabled':''}>${price<=0?'Sem preço':'Adicionar'}</button></div></article>`;
+  const searchText=[p.name,p.brand,p.code,p.ean,p.category,p.unit].map(v=>String(v||'').toLowerCase()).join(' ');
+  return `<article class="product-card ${unavailable?'out':''}" data-product-search="${esc(searchText)}" data-product-category="${esc(p.category||'Outros')}">${productThumb(p)}<span class="code">Cód. ${esc(p.code)}${p.ean?' · '+esc(p.ean):''}</span><h3>${esc(p.name)}</h3><div class="product-brand">${esc(p.brand)}</div><div class="product-price">${price>0?money(price):'<span class="price-review">Preço sob consulta</span>'}</div><div class="product-unit">${esc(p.unit)}</div><div class="stock ${stock<20?'critical':stock<50?'low':'ok'}">● ${unavailable?'Sem estoque':`${qtyBR(stock)} em estoque`}</div><div class="product-entry">Entrada: ${dateBR(p.entry_date)} · Lote: ${esc(p.lot||'—')}</div><div class="product-actions"><input id="q${p.id}" aria-label="Quantidade" inputmode="numeric" type="number" min="1" max="${Math.floor(stock)}" value="1" ${unavailable?'disabled':''}><button class="btn btn-primary" onclick="addCart('${p.id}')" ${unavailable?'disabled':''}>Adicionar</button></div></article>`;
 }
 function addCart(id){
   const p=state.products.find(x=>sameId(x.id,id)); if(!p)return toast('Produto não encontrado. Atualize a página.',true);
-  const stock=Number(p.stock), price=Number(p.price); if(stock<=0)return toast('Produto sem estoque.',true); if(price<=0)return toast('Esse produto ainda está sem preço de venda.',true);
+  const stock=Number(p.stock), price=Number(p.price); if(stock<=0)return toast('Produto sem estoque.',true);
   const input=byId(`q${p.id}`), requested=Math.max(1,Math.floor(Number(input?.value)||1)); const qty=Math.min(Math.floor(stock),requested);
   const existing=state.cart.find(x=>sameId(x.id,p.id));
   if(existing) existing.qty=Math.min(Math.floor(stock),Number(existing.qty)+qty); else state.cart.push({id:p.id,name:p.name,unit:p.unit,price,image_url:p.image_url,icon:p.icon,stock,qty});
@@ -208,8 +225,8 @@ function adminProducts(){
   const list=filteredProducts();
   return `${pageTitle('CADASTRO E ESTOQUE','Produtos','Cadastre, ajuste o catálogo e acompanhe o estoque.',`<div class="actions"><button class="btn btn-light" onclick="setView('import')">⇧ Importar CSV</button><button class="btn btn-primary" onclick="openProductForm()">+ Produto</button></div>`)}
   ${state.editing!==null?productForm():''}
-  <div class="panel toolbar"><div class="toolbar-search"><span>⌕</span><input id="admin_product_search" placeholder="Buscar produto, código ou marca..." value="${esc(state.search)}" oninput="updateProductSearch(this.value,'admin_product_search')"></div><div class="toolbar-meta"><b>${list.length}</b> produtos</div></div>
-  <div class="panel table-wrap"><table class="table"><thead><tr><th>Produto</th><th>Código / EAN</th><th>Categoria</th><th>Preço</th><th>Estoque</th><th>Entrada</th><th class="actions-col">Ações</th></tr></thead><tbody>${list.map(p=>`<tr><td data-label="Produto"><div class="table-product">${p.image_url?`<img src="${esc(p.image_url)}" alt="">`:`<span>${esc(p.icon||'📦')}</span>`}<div><b>${esc(p.name)}</b><small>${esc(p.brand)}</small></div></div></td><td data-label="Código / EAN"><b>${esc(p.code)}</b><small>${esc(p.ean||'—')}</small></td><td data-label="Categoria">${esc(p.category)}</td><td data-label="Preço"><b>${money(p.price)}</b>${Number(p.price)<=0?'<small class="danger-text">Revisar preço</small>':''}</td><td data-label="Estoque"><span class="pill ${Number(p.stock)<20?'red':Number(p.stock)<50?'yellow':'green'}">${qtyBR(p.stock)}</span></td><td data-label="Entrada">${dateBR(p.entry_date)}</td><td data-label="Ações"><div class="row-actions"><button class="icon-btn" title="Editar" onclick="openProductForm('${p.id}')">✎</button><button class="icon-btn danger" title="Desativar" onclick="deleteProduct('${p.id}')">⌫</button></div></td></tr>`).join('')}</tbody></table>${!list.length?'<div class="empty">Nenhum produto encontrado.</div>':''}</div>`;
+  <div class="panel toolbar"><div class="toolbar-search"><span>⌕</span><input id="admin_product_search" placeholder="Buscar produto, código ou marca..." value="${esc(state.search)}" oninput="updateProductSearch(this.value,'admin_product_search')"></div><div class="toolbar-meta"><b id="admin_product_count">${list.length}</b> produtos</div></div>
+  <div class="panel table-wrap"><table class="table"><thead><tr><th>Produto</th><th>Código / EAN</th><th>Categoria</th><th>Preço</th><th>Estoque</th><th>Entrada</th><th class="actions-col">Ações</th></tr></thead><tbody>${list.map(p=>`<tr data-product-search="${esc([p.name,p.brand,p.code,p.ean,p.category,p.unit].map(v=>String(v||'').toLowerCase()).join(' '))}" data-product-category="${esc(p.category||'Outros')}"><td data-label="Produto"><div class="table-product">${p.image_url?`<img src="${esc(p.image_url)}" alt="">`:`<span>${esc(p.icon||'📦')}</span>`}<div><b>${esc(p.name)}</b><small>${esc(p.brand)}</small></div></div></td><td data-label="Código / EAN"><b>${esc(p.code)}</b><small>${esc(p.ean||'—')}</small></td><td data-label="Categoria">${esc(p.category)}</td><td data-label="Preço"><b>${money(p.price)}</b>${Number(p.price)<=0?'<small class="danger-text">Revisar preço</small>':''}</td><td data-label="Estoque"><span class="pill ${Number(p.stock)<20?'red':Number(p.stock)<50?'yellow':'green'}">${qtyBR(p.stock)}</span></td><td data-label="Entrada">${dateBR(p.entry_date)}</td><td data-label="Ações"><div class="row-actions"><button class="icon-btn" title="Editar" onclick="openProductForm('${p.id}')">✎</button><button class="icon-btn danger" title="Desativar" onclick="deleteProduct('${p.id}')">⌫</button></div></td></tr>`).join('')}</tbody></table>${!list.length?'<div class="empty">Nenhum produto encontrado.</div>':''}</div>`;
 }
 function openProductForm(id=null){ state.editing=id===null?'new':String(id); render(); setTimeout(()=>$('.product-form')?.scrollIntoView({behavior:'smooth',block:'start'}),20); }
 function lockCheck(id,label,on){return `<label class="protection-option"><input id="${id}" type="checkbox" ${on?'checked':''}><span><b>${label}</b><small>Não sobrescrever nas importações.</small></span></label>`}
@@ -252,8 +269,8 @@ async function deleteProduct(id){
 function cart(){
   const total=state.cart.reduce((s,x)=>s+Number(x.price)*Number(x.qty),0);
   return `${pageTitle('SEU PEDIDO','Meu carrinho','Revise quantidades e valores antes de enviar.',`<button class="btn btn-light" onclick="setView('products')">← Continuar comprando</button>`)}
-  <div class="cart-layout"><div class="panel cart-panel">${state.cart.length?state.cart.map(x=>`<div class="cart-row"><div class="cart-product"><div class="cart-thumb">${x.image_url?`<img src="${esc(x.image_url)}" alt="">`:esc(x.icon||'📦')}</div><div><b>${esc(x.name)}</b><small>${esc(x.unit)}</small></div></div><div class="cart-unit-price">${money(x.price)}</div><div class="qty-control"><button aria-label="Diminuir" onclick="changeQty('${x.id}',-1)">−</button><b>${x.qty}</b><button aria-label="Aumentar" onclick="changeQty('${x.id}',1)">+</button></div><b>${money(Number(x.price)*Number(x.qty))}</b><button class="icon-btn danger" title="Remover" onclick="removeCart('${x.id}')">⌫</button></div>`).join(''):'<div class="empty"><div class="empty-icon">🛒</div><b>Seu carrinho está vazio.</b><span>Adicione produtos para montar o pedido.</span><button class="btn btn-primary" onclick="setView(\'products\')">Ir para produtos</button></div>'}</div>
-  <aside class="panel summary-box"><h3>Resumo do pedido</h3><div class="summary-line"><span>Itens</span><b>${state.cart.reduce((s,x)=>s+Number(x.qty),0)}</b></div><div class="summary-line"><span>Subtotal</span><b>${money(total)}</b></div><div class="summary-total"><span>Total</span><b>${money(total)}</b></div><button class="btn btn-primary full" onclick="finishOrder()" ${!state.cart.length?'disabled':''}>Enviar pedido →</button><p class="summary-note">Ao enviar, o estoque é reservado automaticamente.</p></aside></div>`;
+  <div class="cart-layout"><div class="panel cart-panel">${state.cart.length?state.cart.map(x=>`<div class="cart-row"><div class="cart-product"><div class="cart-thumb">${x.image_url?`<img src="${esc(x.image_url)}" alt="">`:esc(x.icon||'📦')}</div><div><b>${esc(x.name)}</b><small>${esc(x.unit)}</small></div></div><div class="cart-unit-price">${Number(x.price)>0?money(x.price):'<span class="pending-price">Sob consulta</span>'}</div><div class="qty-control"><button aria-label="Diminuir" onclick="changeQty('${x.id}',-1)">−</button><b>${x.qty}</b><button aria-label="Aumentar" onclick="changeQty('${x.id}',1)">+</button></div><b>${Number(x.price)>0?money(Number(x.price)*Number(x.qty)):'A confirmar'}</b><button class="icon-btn danger" title="Remover" onclick="removeCart('${x.id}')">⌫</button></div>`).join(''):'<div class="empty"><div class="empty-icon">🛒</div><b>Seu carrinho está vazio.</b><span>Adicione produtos para montar o pedido.</span><button class="btn btn-primary" onclick="setView(\'products\')">Ir para produtos</button></div>'}</div>
+  <aside class="panel summary-box"><h3>Resumo do pedido</h3><div class="summary-line"><span>Itens</span><b>${state.cart.reduce((s,x)=>s+Number(x.qty),0)}</b></div><div class="summary-line"><span>Total conhecido</span><b>${money(total)}</b></div>${state.cart.some(x=>Number(x.price)<=0)?'<div class="summary-warning">Há itens com preço sob consulta. A central confirma esses valores.</div>':''}<div class="summary-total"><span>Total</span><b>${state.cart.some(x=>Number(x.price)<=0)?'A confirmar':money(total)}</b></div><button class="btn btn-primary full" onclick="finishOrder()" ${!state.cart.length?'disabled':''}>Enviar pedido →</button><p class="summary-note">Ao enviar, o estoque é reservado automaticamente.</p></aside></div>`;
 }
 function changeQty(id,d){const x=state.cart.find(i=>sameId(i.id,id));if(!x)return;const p=state.products.find(i=>sameId(i.id,id));const max=Math.floor(Number(p?.stock??x.stock??0));if(max<=0){removeCart(id);return toast('Produto ficou sem estoque e foi removido.',true)}x.qty=Math.max(1,Math.min(max,Number(x.qty)+d));saveCart();render()}
 function removeCart(id){state.cart=state.cart.filter(x=>!sameId(x.id,id));saveCart();render()}

@@ -1,0 +1,14 @@
+Portal Super Mais v8.3.1 - correções mobile
+
+1. Busca mobile não recria mais o campo a cada letra; teclado permanece aberto.
+2. Produtos com preço sob consulta podem ser adicionados ao carrinho.
+3. Carrinho identifica valores sob consulta e avisa que serão confirmados pela central.
+4. Cards, quantidade, botão Adicionar e navegação inferior foram limitados à largura da tela.
+5. Busca administrativa continua funcionando sem regressão.
+
+Substitua no GitHub:
+- app.js
+- style.css
+- service-worker.js
+
+Depois aguarde Render Live e feche/reabra a PWA ou atualize o navegador.

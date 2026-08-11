@@ -1,4 +1,4 @@
-const CACHE='supermais-v8-3-mobile-first';
+const CACHE='supermais-v8-3-1-mobile-fixes';
 const ASSETS=['/','/index.html','/style.css','/app.js','/logo-supermais.png','/logo-supermais-transparente.png','/manifest.webmanifest'];
 self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)))});
 self.addEventListener('activate',e=>{e.waitUntil(Promise.all([self.clients.claim(),caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k))))]))});
