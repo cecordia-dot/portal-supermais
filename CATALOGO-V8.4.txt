@@ -1,0 +1,20 @@
+Portal Super Mais — v8.4
+
+Alterações:
+- Botão "Limpar catálogo" na tela Produtos e estoque.
+- Confirmação em duas etapas: alerta + digitação da palavra EXCLUIR.
+- Limpeza não apaga pedidos, usuários ou associados.
+- Produtos usados em pedidos antigos são arquivados para preservar o histórico.
+- Produtos nunca usados em pedidos são removidos definitivamente.
+- Códigos dos produtos arquivados são liberados para novo cadastro manual.
+- Exclusão individual segue a mesma regra de preservação do histórico.
+- Cadastro manual pode reutilizar código de produto anteriormente desativado/arquivado.
+- Estado vazio do catálogo agora oferece botão para cadastrar o primeiro produto.
+- Ação individual padronizada de "Desativar" para "Excluir".
+- Botões de ação ajustados para desktop e celular.
+
+Arquivos alterados:
+- app.js
+- server.js
+- style.css
+- service-worker.js

@@ -145,3 +145,15 @@ html,body{overflow-x:hidden;}
   .product-actions{grid-template-columns:64px minmax(0,1fr)}
   .product-actions input{width:64px}
 }
+
+/* v8.4 - limpeza segura do catálogo */
+.btn-danger-soft{background:#fff5f5;color:#b42318;border:1px solid #f3c7c3;box-shadow:none}
+.btn-danger-soft:hover{background:#fff0ef;border-color:#e8aaa4}
+.btn-danger-soft:disabled{opacity:.45;cursor:not-allowed}
+.product-page-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+@media (max-width:700px){
+  .product-page-actions{display:grid!important;grid-template-columns:1fr 1fr;width:100%}
+  .product-page-actions .btn{width:100%;min-width:0}
+  .product-page-actions .btn-danger-soft{grid-column:1/-1;order:3}
+}
+.catalog-empty{min-height:220px}.catalog-empty .btn{margin-top:10px}
