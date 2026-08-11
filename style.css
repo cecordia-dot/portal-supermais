@@ -19,3 +19,69 @@ button:disabled{opacity:.45;cursor:not-allowed}.full{width:100%}.eyebrow{display
 
 /* MVP 6 - integração Sysmo e proteção manual */
 .lock-option{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:10px;color:#5f5675;font-weight:700;cursor:pointer}.lock-option input{width:auto!important;accent-color:var(--primary)}.field-help{display:block;margin-top:5px;color:var(--muted);font-size:10px}.sysmo-box{background:#f7f4ff;border:1px solid #e4dbff;border-radius:10px;padding:10px}.sysmo-box>div{display:flex;flex-wrap:wrap;gap:8px 14px;font-size:11px}.sysmo-box b{width:100%;color:#321079}.sysmo-box span{color:var(--muted)}.sysmo-rules{display:grid;gap:8px;margin-top:16px;font-size:12px;color:#574f68}.small-note{margin-top:10px}.review-price{color:#b66a00!important;font-weight:800!important}
+
+
+/* UI polish - cabeçalho do usuário */
+.topbar{
+  min-height:74px;
+  height:74px;
+  padding:0 28px;
+}
+.top-user{
+  min-width:210px;
+  display:grid;
+  grid-template-columns:38px minmax(0,1fr) 18px;
+  align-items:center;
+  gap:11px;
+  padding:7px 10px;
+  border-radius:12px;
+  color:#fff;
+}
+.top-user:hover{background:rgba(255,255,255,.06)}
+.top-avatar{
+  width:38px;
+  height:38px;
+  flex:0 0 38px;
+  font-size:14px;
+  box-shadow:0 0 0 1px rgba(255,255,255,.28);
+}
+.top-user-copy{
+  display:flex;
+  min-width:0;
+  flex-direction:column;
+  justify-content:center;
+  line-height:1.15;
+}
+.top-user-copy b{
+  display:block;
+  max-width:145px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:13px;
+  font-weight:800;
+  color:#fff;
+}
+.top-user-copy span{
+  display:block;
+  margin-top:4px;
+  max-width:145px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:11px;
+  font-weight:500;
+  color:rgba(255,255,255,.68);
+  opacity:1;
+}
+.top-user-chevron{
+  display:grid;
+  place-items:center;
+  width:18px;
+  height:18px;
+  font-size:18px;
+  line-height:1;
+  color:rgba(255,255,255,.85);
+  transform:translateY(-2px);
+}
+@media(max-width:900px){.top-user{min-width:auto;grid-template-columns:38px}.top-user-copy,.top-user-chevron{display:none}}
