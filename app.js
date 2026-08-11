@@ -107,7 +107,7 @@ function layout(content){
   return `<div class="app-shell">
   <div class="mobile-overlay" onclick="toggleMenu()"></div>
   <aside class="sidebar">
-    <div class="sidebar-logo"><img src="logo-supermais.png" alt="Rede Super Mais"></div>
+    <div class="sidebar-logo"><img src="logo-supermais-transparente.png" alt="Rede Super Mais"></div>
     <div class="side-group-title">Menu</div>
     <nav class="side-nav">
       ${navBtn('dashboard','⌂','Início')}

@@ -23,3 +23,12 @@ service-worker.js
 package.json
 
 Após o deploy ficar Live, use Ctrl+F5 uma vez.
+
+PATCH V8.1 — Busca + usuários
+- Corrigido cursor da busca: ao renderizar resultados, o foco e a posição do cursor são restaurados no fim do texto.
+- Aplicado à busca global, catálogo do associado e busca de produtos do administrativo.
+- Adicionado botão Excluir em Usuários.
+- Exclusão de usuário é lógica (soft delete): some da lista e perde acesso, mas o histórico de pedidos é preservado.
+- O e-mail original é liberado para futuro recadastro.
+- Proteções: não permite excluir o próprio usuário nem o último administrador ativo.
+- Cache PWA atualizado para forçar entrega do JS novo.
