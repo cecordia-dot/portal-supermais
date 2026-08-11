@@ -37,3 +37,14 @@ ACESSOS DE DEMONSTRAÇÃO
 Administrador: admin@supermais.com
 Associado: mercado@supermais.com
 As senhas são definidas por SEED_ADMIN_PASSWORD e SEED_ASSOCIATE_PASSWORD no primeiro deploy.
+
+
+MVP 6 — INTEGRAÇÃO SYSMO
+========================
+- Aceita diretamente o relatório CSV “Análise do Estoque por Marca/Produto” do Sysmo.
+- Reconhece MARCA, Código, Quantidade e “Prç. mrg. zero”.
+- O estoque é sempre atualizado pelo Sysmo.
+- “Prç. mrg. zero” é armazenado apenas como referência de custo; NÃO substitui o preço de venda.
+- Produtos novos entram com preço R$ 0,00 para revisão.
+- No cadastro do produto, o administrador pode proteger Nome, Marca, Categoria, Unidade/gramagem, Preço e Foto.
+- Campos protegidos não são sobrescritos em importações futuras.
