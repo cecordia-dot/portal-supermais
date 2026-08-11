@@ -126,7 +126,7 @@ function layout(content){
   <main class="main">
     <header class="topbar">
       <button class="mobile-menu" aria-label="Abrir menu" onclick="toggleMenu()">☰</button>
-      <div class="search-global"><input aria-label="Buscar produtos" placeholder="Buscar produtos..." value="${esc(state.search)}" oninput="globalSearch(this.value)"><span>⌕</span></div>
+      <div class="search-global"><input id="global_product_search" aria-label="Buscar produtos" placeholder="Buscar produtos..." value="${esc(state.search)}" oninput="updateProductSearch(this.value,'global_product_search',true)"><span>⌕</span></div>
       <div class="top-spacer"></div>
       <div class="profile-wrap">
         <button class="top-user" onclick="toggleProfile()" aria-expanded="${state.profileOpen}">
@@ -141,7 +141,19 @@ function layout(content){
     ${!admin?mobileNav():''}
   </main></div>`;
 }
-function globalSearch(v){ state.search=v; if(state.view!=='products')state.view='products'; render(); setTimeout(()=>$('.search-global input')?.focus(),0); }
+function updateProductSearch(v, focusId, forceProducts=false){
+  state.search=v;
+  if(forceProducts && state.view!=='products') state.view='products';
+  render();
+  requestAnimationFrame(()=>{
+    const input=byId(focusId);
+    if(!input)return;
+    input.focus();
+    const end=input.value.length;
+    try{input.setSelectionRange(end,end)}catch{}
+  });
+}
+function globalSearch(v){ updateProductSearch(v,'global_product_search',true); }
 function mobileNav(){return `<nav class="mobile-bottom">${[['dashboard','⌂','Início'],['products','▦','Produtos'],['cart','🛒','Carrinho'],['orders','📋','Pedidos']].map(x=>`<button class="${state.view===x[0]?'active':''}" onclick="setView('${x[0]}')"><span>${x[1]}</span><small>${x[2]}</small></button>`).join('')}</nav>`}
 
 function pageTitle(eyebrow,title,desc,action=''){return `<div class="page-title"><div><span class="eyebrow">${eyebrow}</span><h1>${title}</h1><p>${desc}</p></div>${action}</div>`}
@@ -173,7 +185,7 @@ function products(){return state.user.role==='admin'?adminProducts():associatePr
 function associateProducts(){
   const list=filteredProducts(), cartCount=state.cart.reduce((s,x)=>s+x.qty,0);
   return `${pageTitle('CATÁLOGO','Produtos disponíveis','Preços e estoque atualizados pela central.',`<button class="btn btn-primary" onclick="setView('cart')">🛒 Carrinho (${cartCount})</button>`)}
-  <div class="catalog-layout"><aside class="filter-panel"><div class="field"><label>Buscar</label><input placeholder="Produto, marca, código..." value="${esc(state.search)}" oninput="state.search=this.value;render()"></div><label class="filter-label">Categoria</label><div class="filter-cats"><button class="${state.category==='Todos'?'active':''}" onclick="state.category='Todos';render()">Todas</button>${categories().map(c=>`<button class="${state.category===c?'active':''}" onclick="state.category=decodeURIComponent('${encodeURIComponent(c)}');render()">${esc(c)}</button>`).join('')}</div></aside>
+  <div class="catalog-layout"><aside class="filter-panel"><div class="field"><label>Buscar</label><input id="catalog_product_search" placeholder="Produto, marca, código..." value="${esc(state.search)}" oninput="updateProductSearch(this.value,'catalog_product_search')"></div><label class="filter-label">Categoria</label><div class="filter-cats"><button class="${state.category==='Todos'?'active':''}" onclick="state.category='Todos';render()">Todas</button>${categories().map(c=>`<button class="${state.category===c?'active':''}" onclick="state.category=decodeURIComponent('${encodeURIComponent(c)}');render()">${esc(c)}</button>`).join('')}</div></aside>
   <section><div class="catalog-head"><div><h2>${esc(state.category)}</h2><span class="meta">${list.length} produtos encontrados</span></div>${state.search||state.category!=='Todos'?`<button class="btn btn-ghost" onclick="clearProductFilters()">Limpar filtros</button>`:''}</div>
   <div class="product-grid">${list.length?list.map(productCard).join(''):'<div class="panel empty wide">Nenhum produto encontrado com esses filtros.</div>'}</div></section></div>`;
 }
@@ -195,7 +207,7 @@ function adminProducts(){
   const list=filteredProducts();
   return `${pageTitle('CADASTRO E ESTOQUE','Produtos','Cadastre, ajuste o catálogo e acompanhe o estoque.',`<div class="actions"><button class="btn btn-light" onclick="setView('import')">⇧ Importar CSV</button><button class="btn btn-primary" onclick="openProductForm()">+ Produto</button></div>`)}
   ${state.editing!==null?productForm():''}
-  <div class="panel toolbar"><div class="toolbar-search"><span>⌕</span><input placeholder="Buscar produto, código ou marca..." value="${esc(state.search)}" oninput="state.search=this.value;render()"></div><div class="toolbar-meta"><b>${list.length}</b> produtos</div></div>
+  <div class="panel toolbar"><div class="toolbar-search"><span>⌕</span><input id="admin_product_search" placeholder="Buscar produto, código ou marca..." value="${esc(state.search)}" oninput="updateProductSearch(this.value,'admin_product_search')"></div><div class="toolbar-meta"><b>${list.length}</b> produtos</div></div>
   <div class="panel table-wrap"><table class="table"><thead><tr><th>Produto</th><th>Código / EAN</th><th>Categoria</th><th>Preço</th><th>Estoque</th><th>Entrada</th><th class="actions-col">Ações</th></tr></thead><tbody>${list.map(p=>`<tr><td><div class="table-product">${p.image_url?`<img src="${esc(p.image_url)}" alt="">`:`<span>${esc(p.icon||'📦')}</span>`}<div><b>${esc(p.name)}</b><small>${esc(p.brand)}</small></div></div></td><td><b>${esc(p.code)}</b><small>${esc(p.ean||'—')}</small></td><td>${esc(p.category)}</td><td><b>${money(p.price)}</b>${Number(p.price)<=0?'<small class="danger-text">Revisar preço</small>':''}</td><td><span class="pill ${Number(p.stock)<20?'red':Number(p.stock)<50?'yellow':'green'}">${qtyBR(p.stock)}</span></td><td>${dateBR(p.entry_date)}</td><td><div class="row-actions"><button class="icon-btn" title="Editar" onclick="openProductForm('${p.id}')">✎</button><button class="icon-btn danger" title="Desativar" onclick="deleteProduct('${p.id}')">⌫</button></div></td></tr>`).join('')}</tbody></table>${!list.length?'<div class="empty">Nenhum produto encontrado.</div>':''}</div>`;
 }
 function openProductForm(id=null){ state.editing=id===null?'new':String(id); render(); setTimeout(()=>$('.product-form')?.scrollIntoView({behavior:'smooth',block:'start'}),20); }
@@ -277,7 +289,7 @@ async function deleteAssociate(id){const a=state.associates.find(x=>sameId(x.id,
 
 function users(){
   return `${pageTitle('ACESSOS','Usuários','Crie logins individuais e vincule compradores aos associados.',`<button class="btn btn-primary" onclick="openUserForm()">+ Novo usuário</button>`)}${state.editingUser!==null?userForm():''}
-  <div class="panel table-wrap"><table class="table"><thead><tr><th>Usuário</th><th>E-mail</th><th>Perfil</th><th>Associado</th><th>Status</th><th>Ações</th></tr></thead><tbody>${state.users.map(u=>`<tr><td><b>${esc(u.name)}</b></td><td>${esc(u.email)}</td><td>${u.role==='admin'?'Administrador':'Associado'}</td><td>${esc(u.associate_name||'—')}</td><td><span class="pill ${u.active?'green':'red'}">${u.active?'Ativo':'Inativo'}</span></td><td><button class="icon-btn" title="Editar" onclick="openUserForm('${u.id}')">✎</button></td></tr>`).join('')}</tbody></table>${!state.users.length?'<div class="empty">Nenhum usuário cadastrado.</div>':''}</div>`;
+  <div class="panel table-wrap"><table class="table"><thead><tr><th>Usuário</th><th>E-mail</th><th>Perfil</th><th>Associado</th><th>Status</th><th>Ações</th></tr></thead><tbody>${state.users.map(u=>`<tr><td><b>${esc(u.name)}</b></td><td>${esc(u.email)}</td><td>${u.role==='admin'?'Administrador':'Associado'}</td><td>${esc(u.associate_name||'—')}</td><td><span class="pill ${u.active?'green':'red'}">${u.active?'Ativo':'Inativo'}</span></td><td><div class="row-actions"><button class="icon-btn" title="Editar" onclick="openUserForm('${u.id}')">✎</button><button class="icon-btn danger" title="Excluir usuário" onclick="deleteUser('${u.id}')" ${sameId(u.id,state.user.id)?'disabled':''}>⌫</button></div></td></tr>`).join('')}</tbody></table>${!state.users.length?'<div class="empty">Nenhum usuário cadastrado.</div>':''}</div>`;
 }
 function openUserForm(id=null){state.editingUser=id===null?'new':String(id);render();setTimeout(()=>$('.entity-form')?.scrollIntoView({behavior:'smooth',block:'start'}),20)}
 function userForm(){
@@ -287,6 +299,20 @@ function userForm(){
 function userAssocSelect(selected){return `<label>Associado *</label><select id="u_associate"><option value="">Selecione...</option>${state.associates.filter(a=>a.active).map(a=>`<option value="${a.id}" ${sameId(selected,a.id)?'selected':''}>${esc(a.trade_name)}</option>`).join('')}</select>`}
 function renderUserAssoc(){const holder=byId('user-assoc-holder');if(!holder)return;holder.innerHTML=val('u_role')==='associate'?userAssocSelect(state.editingUser==='new'?'':state.users.find(x=>sameId(x.id,state.editingUser))?.associate_id):'<label>Associado</label><div class="disabled-field">Não se aplica</div>'}
 async function saveUser(){const b={name:val('u_name').trim(),email:val('u_email').trim(),role:val('u_role'),associate_id:val('u_associate')||null,password:val('u_password'),active:byId('u_active')?Number(val('u_active')):1};if(!b.name||!b.email)return toast('Nome e e-mail são obrigatórios.',true);if(state.editingUser==='new'&&b.password.length<8)return toast('A senha deve ter pelo menos 8 caracteres.',true);if(b.role==='associate'&&!b.associate_id)return toast('Selecione o associado.',true);try{if(state.editingUser==='new')await api('/api/users',{method:'POST',body:JSON.stringify(b)});else await api(`/api/users/${state.editingUser}`,{method:'PUT',body:JSON.stringify(b)});state.editingUser=null;await refreshData();toast('Usuário salvo.');render()}catch(e){toast(e.message,true)}}
+async function deleteUser(id){
+  const u=state.users.find(x=>sameId(x.id,id));
+  if(!u)return toast('Usuário não encontrado.',true);
+  if(sameId(u.id,state.user.id))return toast('Você não pode excluir o próprio usuário.',true);
+  if(!confirm(`Excluir o usuário ${u.name}? O histórico de pedidos será preservado.`))return;
+  try{
+    setBusy(true);
+    await api(`/api/users/${id}`,{method:'DELETE'});
+    if(sameId(state.editingUser,id))state.editingUser=null;
+    await refreshData();
+    toast('Usuário excluído.');
+    render();
+  }catch(e){toast(e.message,true)}finally{setBusy(false)}
+}
 
 function importPage(){return `${pageTitle('IMPORTAÇÃO EM MASSA','Importar estoque do Sysmo','Envie o CSV “Análise do Estoque por Marca/Produto”.',`<a class="btn btn-light download-link" href="modelo-importacao.csv" download>↓ Modelo CSV</a>`)}
 <div class="import-grid"><section class="panel import-info"><h2>Como funciona</h2><p>O portal reconhece o relatório do Sysmo e usa o <b>código</b> como identificação do item.</p><div class="import-note"><b>Importante:</b> o estoque é atualizado pelo Sysmo. Campos protegidos permanecem manuais e o preço de venda não é substituído pelo valor de margem zero.</div><div class="sysmo-rules"><div><span>✓</span>Código identifica o produto</div><div><span>✓</span>Quantidade atualiza o estoque</div><div><span>✓</span>Margem zero fica só como referência</div><div><span>✓</span>Produto novo entra com preço R$ 0,00</div></div></section>

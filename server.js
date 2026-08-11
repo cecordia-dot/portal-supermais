@@ -100,6 +100,7 @@ async function initDb(){
     CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
     CREATE INDEX IF NOT EXISTS idx_products_active_name ON products(active,name);
   `);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ`);
   await pool.query(`ALTER TABLE products ALTER COLUMN stock TYPE NUMERIC(14,3) USING stock::numeric`);
   await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS sysmo_name TEXT`);
   await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS sysmo_brand TEXT`);
@@ -247,13 +248,33 @@ async function api(req,res,url){
   if(m&&req.method==='PUT'){if(!await requireAuth(req,res,'admin'))return;const b=await parseBody(req),id=Number(m[0]);if(!clean(b.corporate_name)||!clean(b.trade_name)||!clean(b.cnpj))return json(res,400,{error:'Razão social, nome fantasia e CNPJ são obrigatórios.'});try{const r=await pool.query('UPDATE associates SET corporate_name=$1,trade_name=$2,cnpj=$3,phone=$4,email=$5,active=$6 WHERE id=$7 RETURNING *',[clean(b.corporate_name),clean(b.trade_name),clean(b.cnpj),clean(b.phone)||null,clean(b.email)||null,b.active===0?false:true,id]);if(!r.rowCount)return json(res,404,{error:'Associado não encontrado.'});return json(res,200,{associate:r.rows[0]});}catch(e){return json(res,400,{error:e.code==='23505'?'CNPJ já cadastrado.':'Não foi possível atualizar o associado.'});}}
   if(m&&req.method==='DELETE'){if(!await requireAuth(req,res,'admin'))return;const id=Number(m[0]);await pool.query('UPDATE associates SET active=FALSE WHERE id=$1',[id]);await pool.query('UPDATE users SET active=FALSE WHERE associate_id=$1',[id]);return json(res,200,{ok:true});}
 
-  if(p==='/api/users'&&req.method==='GET'){if(!await requireAuth(req,res,'admin'))return;const r=await pool.query(`SELECT u.id,u.name,u.email,u.role,u.cnpj,u.associate_id,u.active,u.created_at,a.trade_name associate_name FROM users u LEFT JOIN associates a ON a.id=u.associate_id ORDER BY u.name`);return json(res,200,{users:r.rows});}
+  if(p==='/api/users'&&req.method==='GET'){if(!await requireAuth(req,res,'admin'))return;const r=await pool.query(`SELECT u.id,u.name,u.email,u.role,u.cnpj,u.associate_id,u.active,u.created_at,a.trade_name associate_name FROM users u LEFT JOIN associates a ON a.id=u.associate_id WHERE u.deleted_at IS NULL ORDER BY u.name`);return json(res,200,{users:r.rows});}
   if(p==='/api/users'&&req.method==='POST'){
     if(!await requireAuth(req,res,'admin'))return;const b=await parseBody(req);if(!clean(b.name)||!clean(b.email)||!clean(b.password))return json(res,400,{error:'Nome, e-mail e senha são obrigatórios.'});if(clean(b.password).length<8)return json(res,400,{error:'A senha deve ter pelo menos 8 caracteres.'});const role=b.role==='admin'?'admin':'associate';if(role==='associate'&&!Number(b.associate_id))return json(res,400,{error:'Selecione o associado.'});
     try{let assoc=null;if(role==='associate'){const ar=await pool.query('SELECT cnpj FROM associates WHERE id=$1 AND active=TRUE',[Number(b.associate_id)]);assoc=ar.rows[0];if(!assoc)return json(res,400,{error:'Associado inválido.'});}const r=await pool.query('INSERT INTO users(name,email,password_hash,role,cnpj,associate_id,active) VALUES($1,$2,$3,$4,$5,$6,TRUE) RETURNING id',[clean(b.name),clean(b.email).toLowerCase(),hashPassword(clean(b.password)),role,assoc?.cnpj||null,role==='associate'?Number(b.associate_id):null]);return json(res,201,{id:Number(r.rows[0].id)});}catch(e){return json(res,400,{error:e.code==='23505'?'E-mail já cadastrado.':'Não foi possível criar o usuário.'});}
   }
   m=routeMatch(p,/^\/api\/users\/(\d+)$/);
-  if(m&&req.method==='PUT'){if(!await requireAuth(req,res,'admin'))return;const b=await parseBody(req),id=Number(m[0]);if(!clean(b.name)||!clean(b.email))return json(res,400,{error:'Nome e e-mail são obrigatórios.'});const cr=await pool.query('SELECT * FROM users WHERE id=$1',[id]);if(!cr.rowCount)return json(res,404,{error:'Usuário não encontrado.'});const role=b.role==='admin'?'admin':'associate';let assoc=null;if(role==='associate'){if(!Number(b.associate_id))return json(res,400,{error:'Selecione o associado.'});const ar=await pool.query('SELECT cnpj FROM associates WHERE id=$1 AND active=TRUE',[Number(b.associate_id)]);assoc=ar.rows[0];if(!assoc)return json(res,400,{error:'Associado inválido ou inativo.'});}try{if(clean(b.password)){if(clean(b.password).length<8)return json(res,400,{error:'A senha deve ter pelo menos 8 caracteres.'});await pool.query('UPDATE users SET name=$1,email=$2,role=$3,cnpj=$4,associate_id=$5,active=$6,password_hash=$7 WHERE id=$8',[clean(b.name),clean(b.email).toLowerCase(),role,assoc?.cnpj||null,role==='associate'?Number(b.associate_id):null,b.active===0?false:true,hashPassword(clean(b.password)),id]);}else await pool.query('UPDATE users SET name=$1,email=$2,role=$3,cnpj=$4,associate_id=$5,active=$6 WHERE id=$7',[clean(b.name),clean(b.email).toLowerCase(),role,assoc?.cnpj||null,role==='associate'?Number(b.associate_id):null,b.active===0?false:true,id]);return json(res,200,{ok:true});}catch(e){return json(res,400,{error:e.code==='23505'?'E-mail já cadastrado.':'Não foi possível atualizar o usuário.'});}}
+  if(m&&req.method==='PUT'){if(!await requireAuth(req,res,'admin'))return;const b=await parseBody(req),id=Number(m[0]);if(!clean(b.name)||!clean(b.email))return json(res,400,{error:'Nome e e-mail são obrigatórios.'});const cr=await pool.query('SELECT * FROM users WHERE id=$1 AND deleted_at IS NULL',[id]);if(!cr.rowCount)return json(res,404,{error:'Usuário não encontrado.'});const role=b.role==='admin'?'admin':'associate';let assoc=null;if(role==='associate'){if(!Number(b.associate_id))return json(res,400,{error:'Selecione o associado.'});const ar=await pool.query('SELECT cnpj FROM associates WHERE id=$1 AND active=TRUE',[Number(b.associate_id)]);assoc=ar.rows[0];if(!assoc)return json(res,400,{error:'Associado inválido ou inativo.'});}try{if(clean(b.password)){if(clean(b.password).length<8)return json(res,400,{error:'A senha deve ter pelo menos 8 caracteres.'});await pool.query('UPDATE users SET name=$1,email=$2,role=$3,cnpj=$4,associate_id=$5,active=$6,password_hash=$7 WHERE id=$8',[clean(b.name),clean(b.email).toLowerCase(),role,assoc?.cnpj||null,role==='associate'?Number(b.associate_id):null,b.active===0?false:true,hashPassword(clean(b.password)),id]);}else await pool.query('UPDATE users SET name=$1,email=$2,role=$3,cnpj=$4,associate_id=$5,active=$6 WHERE id=$7',[clean(b.name),clean(b.email).toLowerCase(),role,assoc?.cnpj||null,role==='associate'?Number(b.associate_id):null,b.active===0?false:true,id]);return json(res,200,{ok:true});}catch(e){return json(res,400,{error:e.code==='23505'?'E-mail já cadastrado.':'Não foi possível atualizar o usuário.'});}}
+  if(m&&req.method==='DELETE'){
+    const admin=await requireAuth(req,res,'admin');if(!admin)return;
+    const id=Number(m[0]);
+    if(Number(admin.id)===id)return json(res,400,{error:'Você não pode excluir o próprio usuário.'});
+    const cr=await pool.query('SELECT id,role,active FROM users WHERE id=$1 AND deleted_at IS NULL',[id]);
+    if(!cr.rowCount)return json(res,404,{error:'Usuário não encontrado.'});
+    if(cr.rows[0].role==='admin'&&cr.rows[0].active){
+      const admins=await pool.query("SELECT COUNT(*)::int n FROM users WHERE role='admin' AND active=TRUE AND deleted_at IS NULL");
+      if(admins.rows[0].n<=1)return json(res,400,{error:'Não é possível excluir o último administrador ativo.'});
+    }
+    const client=await pool.connect();
+    try{
+      await client.query('BEGIN');
+      await client.query('DELETE FROM sessions WHERE user_id=$1',[id]);
+      await client.query(`UPDATE users SET active=FALSE,deleted_at=NOW(),email='excluido-'||id||'-'||floor(extract(epoch from NOW()))::bigint||'@supermais.invalid' WHERE id=$1`,[id]);
+      await client.query('COMMIT');
+      return json(res,200,{ok:true});
+    }catch(e){await client.query('ROLLBACK');return json(res,500,{error:'Não foi possível excluir o usuário.'});}
+    finally{client.release();}
+  }
 
   if(p==='/api/orders'&&req.method==='GET'){
     const u=await requireAuth(req,res);if(!u)return;let r;if(u.role==='admin')r=await pool.query(`SELECT o.*,COALESCE(a.trade_name,u.name) associate_name FROM orders o JOIN users u ON u.id=o.user_id LEFT JOIN associates a ON a.id=u.associate_id ORDER BY o.id DESC`);else r=await pool.query(`SELECT o.*,COALESCE(a.trade_name,u.name) associate_name FROM orders o JOIN users u ON u.id=o.user_id LEFT JOIN associates a ON a.id=u.associate_id WHERE u.associate_id=$1 ORDER BY o.id DESC`,[u.associate_id]);const ids=r.rows.map(x=>x.id);let itemRows=[];if(ids.length){const ir=await pool.query(`SELECT oi.*,p.name,p.code,p.unit FROM order_items oi JOIN products p ON p.id=oi.product_id WHERE oi.order_id = ANY($1::bigint[]) ORDER BY oi.id`,[ids]);itemRows=ir.rows;}const grouped={};for(const it of itemRows)(grouped[it.order_id]??=[]).push(it);return json(res,200,{orders:r.rows.map(o=>({...o,items:grouped[o.id]||[]}))});
@@ -288,7 +309,7 @@ async function api(req,res,url){
 
   if(p==='/api/admin/stats'&&req.method==='GET'){
     if(!await requireAuth(req,res,'admin'))return;const [products,associates,users,open,month]=await Promise.all([
-      pool.query('SELECT COUNT(*)::int n FROM products WHERE active=TRUE'),pool.query('SELECT COUNT(*)::int n FROM associates WHERE active=TRUE'),pool.query('SELECT COUNT(*)::int n FROM users WHERE active=TRUE'),pool.query("SELECT COUNT(*)::int n FROM orders WHERE status NOT IN ('Entregue','Cancelado')"),pool.query("SELECT COALESCE(SUM(total),0)::numeric n FROM orders WHERE status!='Cancelado' AND created_at>=date_trunc('month',CURRENT_DATE)")]);
+      pool.query('SELECT COUNT(*)::int n FROM products WHERE active=TRUE'),pool.query('SELECT COUNT(*)::int n FROM associates WHERE active=TRUE'),pool.query('SELECT COUNT(*)::int n FROM users WHERE active=TRUE AND deleted_at IS NULL'),pool.query("SELECT COUNT(*)::int n FROM orders WHERE status NOT IN ('Entregue','Cancelado')"),pool.query("SELECT COALESCE(SUM(total),0)::numeric n FROM orders WHERE status!='Cancelado' AND created_at>=date_trunc('month',CURRENT_DATE)")]);
     return json(res,200,{stats:{products:products.rows[0].n,associates:associates.rows[0].n,users:users.rows[0].n,open_orders:open.rows[0].n,month_sales:Number(month.rows[0].n)}});
   }
   return json(res,404,{error:'Rota não encontrada.'});
